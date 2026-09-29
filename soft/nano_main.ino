@@ -44,7 +44,7 @@ unsigned long lastPrint = 0;
 
 void setEscPulse(uint16_t us)
 {
-  us = constrain(us, 1000, 1600);
+  us = constrain(us, 1000, 2000);
 
   // Однобайтовая запись -> безопасна относительно ISR
   escPulseTicks = us / 8;
@@ -222,12 +222,12 @@ void loop()
             targetPulse = map(
               potValue,
               0, 1023,
-              1000, 1600
+              1000, 2000
             );
 
             targetPulse = constrain(
               targetPulse,
-              1000, 1600
+              1000, 2000
             );
           }
         }
