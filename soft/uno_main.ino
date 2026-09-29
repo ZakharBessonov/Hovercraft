@@ -1,48 +1,54 @@
 #include <SPI.h>
-#include <nRF24L01.h>
-#include <RF24.h>
+#include <RH_NRF905.h>
 
-RF24 radio(7, 10);  // CE, CSN
-
-const byte address[6] = "MTR01";
+RH_NRF905 radio(8, 9, 10);
 
 const int POT_PIN = A0;
 
 void setup() {
   Serial.begin(9600);
+  delay(1000);
 
-  if (!radio.begin()) {
-    Serial.println("ERROR:ddcn n nRF24L01 не найден");
+  Serial.println("Запуск nRF905...");
+
+  if (!radio.init()) {
+    Serial.println("ERROR: nRF905 не инициализировался");
     while (1);
   }
 
-  radio.setPALevel(RF24_PA_LOW);
-  radio.setDataRate(RF24_1MBPS);
-  radio.setChannel(76);
+  radio.setChannel(108);
+  radio.setRF(RH_NRF905::TransmitPower10dBm);
 
-  radio.openWritingPipe(address);
-  radio.stopListening();
-
-  Serial.println("Передатчик готов");
+  Serial.println("nRF905 готов");
 }
 
 void loop() {
-  int pot = analogRead(POT_PIN);
+  uint16_t pot = analogRead(POT_PIN);
 
-  // 0 положения потенциометра = стоп
-  // 1023 = максимальный разрешённый газ
-  uint16_t throttle = map(pot, 0, 1023, 1000, 1600);
+  // На всякий случай выводим радио из зависшего TX-состояния
+  radio.setModeIdle();
 
-  bool success = radio.write(&throttle, sizeof(throttle));
+  bool ok = radio.send((uint8_t*)&pot, sizeof(pot));
 
-  Serial.print("Pot: ");
-  Serial.print(pot);
+  if (!ok) {
+    Serial.println("Ошибка запуска передачи");
+    delay(50);
+    return;
+  }
 
-  Serial.print("  ESC: ");
-  Serial.print(throttle);
+  // Ждём завершения передачи, но максимум 30 мс
+  unsigned long start = millis();
 
-  Serial.print("  Radio: ");
-  Serial.println(success ? "OK" : "FAIL");
+  while (radio.isSending()) {
+    if (millis() - start > 30) {
+      Serial.println("TX TIMEOUT");
+      radio.setModeIdle();
+      break;
+    }
+  }
 
-  delay(50);
+  Serial.print("Передано: ");
+  Serial.println(pot);
+
+  delay(100);
 }
