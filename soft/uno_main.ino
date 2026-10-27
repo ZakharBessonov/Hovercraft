@@ -1,54 +1,79 @@
 #include <SPI.h>
 #include <RH_NRF905.h>
+#include <string.h>
 
+// Constructor order: TRX_CE, TX_EN, CSN.
 RH_NRF905 radio(8, 9, 10);
+const uint16_t CHANNEL = 108;  // 433.2 MHz, low band
+uint8_t networkAddress[] = {0x42, 0x4F, 0x41, 0x54};
 
-const int POT_PIN = A0;
+void stopWithError(const __FlashStringHelper *message) {
+  Serial.println(message);
+  while (true) { delay(1000); }
+}
 
-void setup() {
-  Serial.begin(9600);
+void setupRadio() {
+  Serial.begin(115200);
   delay(1000);
 
-  Serial.println("Запуск nRF905...");
+  // PWR_UP must be connected to 3.3 V separately.
+  if (!radio.init()) stopWithError(F("ERROR: radio.init"));
+  radio.setModeIdle();
 
-  if (!radio.init()) {
-    Serial.println("ERROR: nRF905 не инициализировался");
-    while (1);
+  // Verify the actual SPI write/read path; init() alone is not this test.
+  uint8_t saved = radio.spiReadRegister(0);
+  radio.spiWriteRegister(0, 0x5A);
+  bool spiOK = (radio.spiReadRegister(0) == 0x5A);
+  radio.spiWriteRegister(0, 0xA5);
+  spiOK = (radio.spiReadRegister(0) == 0xA5) && spiOK;
+  radio.spiWriteRegister(0, saved);
+  if (!spiOK) stopWithError(F("ERROR: SPI write/read; check VCC, GND, CSN, MOSI, MISO, SCK"));
+
+  radio.setChannel(CHANNEL, false);
+  radio.setNetworkAddress(networkAddress, sizeof(networkAddress));
+  // Low power is enough for a bench test with antennas, about 1 m apart.
+  radio.setRF(RH_NRF905::TransmitPowerm10dBm);
+
+  bool configOK = (radio.spiReadRegister(0) == 0x6C);
+  for (uint8_t i = 0; i < sizeof(networkAddress); ++i) {
+    configOK = (radio.spiReadRegister(5 + i) == networkAddress[i]) && configOK;
   }
+  if (!configOK) stopWithError(F("ERROR: radio configuration readback"));
+  Serial.println(F("SPI OK, REG0=0x6C, channel=108, band=433 MHz"));
+}
 
-  radio.setChannel(108);
-  radio.setRF(RH_NRF905::TransmitPower10dBm);
+const uint8_t POT_PIN = A0;
 
-  Serial.println("nRF905 готов");
+void setup() {
+  setupRadio();
+  pinMode(POT_PIN, INPUT);
+  Serial.println(F("UNO potentiometer TX ready"));
 }
 
 void loop() {
-  uint16_t pot = analogRead(POT_PIN);
-
-  // На всякий случай выводим радио из зависшего TX-состояния
+  uint16_t potValue = analogRead(POT_PIN);
+  // Two bytes, least significant byte first.
+  uint8_t payload[2] = {
+    static_cast<uint8_t>(potValue & 0xFF),
+    static_cast<uint8_t>(potValue >> 8)
+  };
   radio.setModeIdle();
-
-  bool ok = radio.send((uint8_t*)&pot, sizeof(pot));
-
-  if (!ok) {
-    Serial.println("Ошибка запуска передачи");
+  if (!radio.send(payload, sizeof(payload))) {
+    Serial.println(F("ERROR: send()"));
     delay(50);
     return;
   }
-
-  // Ждём завершения передачи, но максимум 30 мс
-  unsigned long start = millis();
-
-  while (radio.isSending()) {
-    if (millis() - start > 30) {
-      Serial.println("TX TIMEOUT");
-      radio.setModeIdle();
-      break;
-    }
+  unsigned long started = millis();
+  while (radio.isSending() && millis() - started < 500UL) {
+    delay(1);
   }
-
-  Serial.print("Передано: ");
-  Serial.println(pot);
-
-  delay(100);
+  bool finished = !radio.isSending();
+  radio.setModeIdle();
+  if (finished) {
+    Serial.print(F("TX POT="));
+    Serial.println(potValue);
+  } else {
+    Serial.println(F("TX_TIMEOUT"));
+  }
+  delay(50);
 }
