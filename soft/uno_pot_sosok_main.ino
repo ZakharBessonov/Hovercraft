@@ -84,13 +84,25 @@ uint8_t angleFromX(uint16_t x){
   return static_cast<uint8_t>(angle);
 }
 
-uint16_t throttleFromY(uint16_t y){
-  if(UP_IS_LOW){
-    if(y>=centerY-DEAD_ZONE)return 0;
-    return static_cast<uint16_t>(map(y,centerY-DEAD_ZONE,0,0,1023));
+uint16_t throttleFromY(uint16_t y) {
+  const int GAS_DEAD_ZONE = 100;
+
+  if (UP_IS_LOW) {
+    // Центр, небольшое отклонение и движение вниз — стоп.
+    if (y >= centerY - GAS_DEAD_ZONE) return 0;
+
+    return (uint16_t)map(
+      y, centerY - GAS_DEAD_ZONE, 0,
+      0, 1023
+    );
   }
-  if(y<=centerY+DEAD_ZONE)return 0;
-  return static_cast<uint16_t>(map(y,centerY+DEAD_ZONE,1023,0,1023));
+
+  if (y <= centerY + GAS_DEAD_ZONE) return 0;
+
+  return (uint16_t)map(
+    y, centerY + GAS_DEAD_ZONE, 1023,
+    0, 1023
+  );
 }
 
 void setup(){
