@@ -120,8 +120,8 @@ void setup(){
 
 void loop(){
   // These are independent readings from two DIFFERENT physical analog pins.
-  uint16_t rawX=readInput(A0);
-  uint16_t rawY=readInput(A1);
+  uint16_t rawX=readInput(A2);
+  uint16_t rawY=readInput(A3);
   uint16_t pot=USE_POT_MOTOR?readInput(A4):0;
   uint16_t throttle=inputOK?throttleFromY(rawY):0;
   uint8_t steering=inputOK?steeringFromX(rawX):90;
@@ -139,8 +139,8 @@ void loop(){
   if(!sent)Serial.println(F("TX_ERROR"));
   if(millis()-lastPrint>=250UL){
     lastPrint=millis();
-    Serial.print(F("A0="));Serial.print(rawX);
-    Serial.print(F(" A1="));Serial.print(rawY);
+    Serial.print(F("A2="));Serial.print(rawX);
+    Serial.print(F(" A3="));Serial.print(rawY);
     Serial.print(F(" STEER="));Serial.print(static_cast<int>(steering)-90);
     Serial.print(F(" THR="));Serial.print(throttle);
     Serial.print(F(" POT="));Serial.print(pot);
