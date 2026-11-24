@@ -1,11 +1,11 @@
-// VRX -> A0: bidirectional speed for a continuous-rotation servo.
-// VRY -> A1: upward throttle for ESC2 on Nano D3.
+// VRX -> A2: differential steering for the two rear motors.
+// VRY -> A3: upward throttle for both rear motors on Nano D3/D4.
 // A4: external throttle potentiometer for ESC1 on Nano D2.
 // Use with the matching Nano sketch (packet version 4).
 #include <SPI.h>
 #include <RH_NRF905.h>
 
-// true = stick UP makes A1 smaller; false = UP makes A1 larger.
+// true = stick UP makes A3 smaller; false = UP makes A3 larger.
 const bool UP_IS_LOW=true;
 const bool REVERSE_STEERING=false;
 // Keep true only if external throttle potentiometer is wired to A4.
@@ -70,12 +70,12 @@ uint16_t readInput(uint8_t pin){
 
 void measureCenter(){
   uint32_t sx=0,sy=0;
-  for(uint8_t i=0;i<32;++i){sx+=readInput(A0);sy+=readInput(A1);delay(2);}
+  for(uint8_t i=0;i<32;++i){sx+=readInput(A2);sy+=readInput(A3);delay(2);}
   centerX=sx/32;centerY=sy/32;
   inputOK=centerX>=200 && centerX<=823 && centerY>=200 && centerY<=823;
-  Serial.print(F("CENTER A0="));Serial.print(centerX);
-  Serial.print(F(" A1="));Serial.println(centerY);
-  if(!inputOK)Serial.println(F("BAD_CENTER: release stick/check wiring, then restart UNO"));
+  Serial.print(F("CENTER A2="));Serial.print(centerX);
+  Serial.print(F(" A3="));Serial.println(centerY);
+  if(!inputOK)Serial.println(F("BAD_CENTER: release stick/check wiring, then restart transmitter"));
 }
 
 uint8_t steeringFromX(uint16_t x){
@@ -112,8 +112,8 @@ uint16_t throttleFromY(uint16_t y) {
 
 void setup(){
   setupRadio();
-  pinMode(A0,INPUT);pinMode(A1,INPUT);pinMode(A4,INPUT);
-  Serial.println(F("Release joystick now. FIXED A0=STEERING, A1=THROTTLE"));
+  pinMode(A2,INPUT);pinMode(A3,INPUT);pinMode(A4,INPUT);
+  Serial.println(F("Release joystick now. FIXED A2=STEERING, A3=THROTTLE"));
   delay(1000);measureCenter();
   Serial.println(F("READY: center/down=stop; up=throttle. Monitor 115200 baud"));
 }
